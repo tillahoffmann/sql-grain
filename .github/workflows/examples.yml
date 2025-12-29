@@ -1,4 +1,4 @@
-name: SQL Grain
+name: Examples
 
 on:
   push:
@@ -7,8 +7,13 @@ on:
     branches: [main]
 
 jobs:
-  check:
+  examples:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - ml-small
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
@@ -18,11 +23,6 @@ jobs:
         run: |
           uv sync --dev
           uv pip install -e .
-      - name: Lint
-        run: uv run ruff check
-      - name: Format
-        run: uv run ruff format --check
-      - name: Type check
-        run: uv run pyright
-      - name: Test
-        run: uv run pytest
+      - name: Run example
+        working-directory: examples/${{ matrix.example }}
+        run: uv run make
