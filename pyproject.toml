@@ -1,0 +1,23 @@
+[project]
+name = "sql-grain"
+version = "0.1.0"
+description = "Sqlite databases as Grain datasets."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "grain>=0.2.15",
+]
+
+[dependency-groups]
+dev = [
+    "flax>=0.12.2",
+    "line-profiler>=5.0.0",
+    "optax>=0.2.6",
+    "orbax>=0.1.9",
+    "pandas>=2.3.3",
+    "pre-commit>=4.5.1",
+    "pyright>=1.1.407",
+    "pytest>=9.0.2",
+    "ruff>=0.14.10",
+    "tqdm>=4.67.1",
+]

@@ -1,0 +1,28 @@
+fail_fast: true
+
+repos:
+  # Backend (Python)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.8
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^
+      - id: ruff-format
+        files: ^
+
+  - repo: local
+    hooks:
+      - id: pyright
+        name: pyright
+        entry: uv run pyright
+        language: system
+        files: ^.*\.py$
+        pass_filenames: false
+
+      - id: pytest
+        name: pytest
+        entry: uv run pytest
+        language: system
+        files: ^.*\.py$
+        pass_filenames: false
