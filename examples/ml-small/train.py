@@ -301,7 +301,7 @@ def main() -> None:
             else:
                 loss = train_step(
                     model, optimizer, inputs, outputs, end_token=tokenizer["<PAD>"]
-                )
+                ).block_until_ready()
 
             progress.update()
             progress.set_description(f"loss={loss:.3f}")
