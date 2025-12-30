@@ -26,3 +26,10 @@ repos:
         language: system
         files: ^.*\.py$
         pass_filenames: false
+
+      - id: build-check
+        name: build-check
+        entry: bash -c 'uv build && uvx twine check dist/*'
+        language: system
+        files: ^(src/|pyproject\.toml)
+        pass_filenames: false
