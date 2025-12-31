@@ -285,11 +285,12 @@ def main() -> None:
     )
     optimizer = nnx.Optimizer(model, optax.adam(args.learning_rate), wrt=nnx.Param)
 
-    # We restrict to one thread because concurrency leads to database lock competition
-    # and actually slows things down. This requires we explicitly call `to_iter_dataset`
-    # because default iteration uses 16 threads.
+    # Use multiprocessing to avoid Python GIL contention during SQLite reads.
+    # Each worker process has its own GIL, enabling true parallelism.
     num_steps = len(train_dataset)
-    train_iter_dataset = train_dataset.to_iter_dataset(grain.ReadOptions(num_threads=1))
+    train_iter_dataset = train_dataset.to_iter_dataset(
+        grain.ReadOptions(num_threads=1)
+    ).mp_prefetch(grain.MultiprocessingOptions(num_workers=4))
     train_iter = iter(train_iter_dataset)
     with tqdm(total=num_steps) as progress, closing(train_iter):
         for inputs, outputs in train_iter:

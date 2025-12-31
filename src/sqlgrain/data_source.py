@@ -27,6 +27,14 @@ class Sqlite3DataSource(RandomAccessDataSource[Mapping[str, Sequence]]):
     returns a record given an integer index used to select an element in the list of
     keys. Each record is a dictionary mapping column names to lists of values.
 
+    .. note::
+
+        For parallel data loading, use :meth:`~grain.IterDataset.mp_prefetch` with
+        multiple worker processes rather than multiple threads. The :mod:`sqlite3`
+        module holds the Python GIL during query result fetching, causing thread-based
+        parallelism to degrade. Multiprocessing avoids this by giving each worker its
+        own GIL.
+
     Args:
         database: Path to database.
         key_query: Query to fetch keys from the database which identify records to be
