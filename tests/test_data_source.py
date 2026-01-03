@@ -68,3 +68,22 @@ def test_data_source_with_record_params(test_db: Path) -> None:
     # Bob: cherry (amount=30) meets threshold
     record = source[1]
     assert record["item"] == ("cherry",)
+
+
+def test_data_source_closing(test_db: Path) -> None:
+    with Sqlite3DataSource(
+        test_db, "SELECT id AS user_id FROM users ORDER BY id", "<EMPTY>"
+    ) as data_source:
+        pass
+    assert not hasattr(data_source._local, "conn")
+
+    with Sqlite3DataSource(
+        test_db, "SELECT id AS user_id FROM users ORDER BY id", "<EMPTY>"
+    ) as data_source:
+        # Access keys to execute a query.
+        data_source.keys
+    assert hasattr(data_source._local, "conn")
+
+    # Check the database is closed.
+    with pytest.raises(sqlite3.ProgrammingError):
+        data_source._get_conn().execute("SELECT id FROM users")

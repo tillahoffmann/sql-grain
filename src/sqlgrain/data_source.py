@@ -1,7 +1,6 @@
 import hashlib
 import sqlite3
 import threading
-from os import PathLike
 from pathlib import Path
 from typing import Any, Mapping, Self, Sequence, SupportsIndex, cast
 
@@ -50,7 +49,7 @@ class Sqlite3DataSource(RandomAccessDataSource[Mapping[str, Sequence]]):
 
     def __init__(
         self,
-        database: PathLike,
+        database: Path | str,
         key_query: str,
         record_query: str,
         key_params: dict | None = None,
@@ -113,8 +112,15 @@ class Sqlite3DataSource(RandomAccessDataSource[Mapping[str, Sequence]]):
         return self
 
     def __exit__(self, *_) -> None:
-        if self._local.conn is not None:
-            self._local.conn.close()
+        self.close()
+
+    def __del__(self) -> None:
+        self.close()
+
+    def close(self) -> None:
+        conn: sqlite3.Connection | None = getattr(self._local, "conn", None)
+        if conn:
+            conn.close()
 
     def __repr__(self) -> str:
         # We need a `__repr__` implementation because `grain` uses it to assess if a
