@@ -10,9 +10,9 @@ from sqlgrain.records import decode_record, from_array_record, to_array_record
 
 
 @pytest.mark.parametrize("use_dataset", [False, True])
-@pytest.mark.parametrize("compression", [None, "zstd"])
+@pytest.mark.parametrize("options", ["group_size:1", "group_size:1,zstd"])
 def test_to_array_record(
-    test_db: Path, tmp_path: Path, use_dataset: bool, compression: str | None
+    test_db: Path, tmp_path: Path, use_dataset: bool, options: str
 ) -> None:
     """Test round-trip serialization to ArrayRecord format."""
     sql_source = Sqlite3DataSource(
@@ -33,7 +33,7 @@ def test_to_array_record(
 
     path = tmp_path / "records"
     to_array_record(
-        cast(Iterable, records), path, aux={"hello": "world"}, compression=compression
+        cast(Iterable, records), path, aux={"hello": "world"}, options=options
     )
 
     # Check just the source.
@@ -51,6 +51,21 @@ def test_to_array_record(
                 assert list(a[key]) == b[key]
             else:
                 np.testing.assert_array_equal(a[key], b[key])
+
+
+def test_shuffle(tmp_path: Path) -> None:
+    """Shuffling requires random access and group_size:1."""
+    records = [{"x": i} for i in range(10)]
+    path = tmp_path / "shuffled"
+    to_array_record(records, path)
+
+    ar_source, _ = from_array_record(path)
+    ar_dataset = (
+        MapDataset.source(cast(Sequence, ar_source)).shuffle(seed=42).map(decode_record)
+    )
+    # Iterate to trigger random access
+    results = [r["x"] for r in ar_dataset]
+    assert sorted(results) == list(range(10))
 
 
 def test_shard_every(tmp_path: Path) -> None:
