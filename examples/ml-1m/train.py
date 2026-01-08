@@ -3,7 +3,7 @@ import os
 import sqlite3
 from contextlib import closing
 from pathlib import Path
-from typing import cast
+from typing import Sequence, cast
 
 import grain
 import numpy as np
@@ -15,7 +15,12 @@ from jax import numpy as jnp
 from model import TransformerModel
 from tqdm import tqdm
 
-from sqlgrain import Sqlite3DataSource
+from sqlgrain import (
+    Sqlite3DataSource,
+    decode_record,
+    from_array_record,
+    to_array_record,
+)
 from sqlgrain.util import assert_true, encode_many
 
 
@@ -68,6 +73,7 @@ def create_dataset(
     context_size: int,
     batch_size: int,
     num_epochs: int,
+    cache: bool,
 ) -> grain.MapDataset:
     """Create a dataset which transforms the raw SQLite results to a form amenable to
     Flax NNX.
@@ -83,9 +89,6 @@ def create_dataset(
         Dataset that can be iterated over.
     """
     dataset = grain.MapDataset.source(data_source)
-    if seed is not None:
-        dataset = dataset.seed(seed)
-    dataset = dataset.shuffle().repeat(num_epochs)
     dataset = (
         dataset.map(lambda record: record["movie_id"])
         # Prepend <START> token and pad to the context size.
@@ -96,9 +99,30 @@ def create_dataset(
         )
         # Encode to consecutive integers.
         .map(encode_many(tokenizer, frozen=False, default=tokenizer["<UNK>"]))
+    )
+
+    # Cache the dataset if desired.
+    if cache:
+        cache_path = data_source.database.with_suffix(
+            data_source.database.suffix + ".cache"
+        )
+        if not cache_path.is_dir():
+            to_array_record(tqdm(dataset, desc="convert to ArrayRecord"), cache_path)
+        ar_data_source, _ = from_array_record(cache_path)
+        dataset = grain.MapDataset.source(cast(Sequence, ar_data_source)).map(
+            decode_record
+        )
+
+    # Seed, shuffle, and repeat for the training set.
+    if seed is not None:
+        dataset = dataset.seed(seed).shuffle()
+    if num_epochs:
+        dataset = dataset.repeat(num_epochs)
+
+    dataset = (
         # Mini-batches for optimization. We drop incomplete batches during training to
         # prevent noisy gradients for small batches.
-        .batch(
+        dataset.batch(
             batch_size,
             drop_remainder=True,
             batch_fn=lambda x: np.asarray(x, dtype=np.int32),
@@ -184,6 +208,7 @@ class _Args:
     learning_rate: float
     dropout: float
     num_heads: int
+    cache: bool
 
 
 def main() -> None:
@@ -230,6 +255,11 @@ def main() -> None:
         help="Number of optimization epochs to run.",
         default=3 if "CI" in os.environ else 201,
     )
+    parser.add_argument(
+        "--cache",
+        action="store_true",
+        help="Cache the dataset as an ArrayRecord dataset.",
+    )
     parser.add_argument("database", type=Path, help="Path to MovieLens database.")
     args = cast(_Args, parser.parse_args())
 
@@ -251,6 +281,7 @@ def main() -> None:
         context_size=args.context_size,
         batch_size=args.batch_size,
         num_epochs=args.num_epochs,
+        cache=args.cache,
     )
 
     # Count distinct movies in the training set (replicating drop_last_k logic).
@@ -285,12 +316,9 @@ def main() -> None:
     )
     optimizer = nnx.Optimizer(model, optax.adam(args.learning_rate), wrt=nnx.Param)
 
-    # Use multiprocessing to avoid Python GIL contention during SQLite reads.
-    # Each worker process has its own GIL, enabling true parallelism.
+    # Create an iterator dataset for training.
     num_steps = len(train_dataset)
-    train_iter_dataset = train_dataset.to_iter_dataset(
-        grain.ReadOptions(num_threads=1)
-    ).mp_prefetch(grain.MultiprocessingOptions(num_workers=4))
+    train_iter_dataset = train_dataset.to_iter_dataset(grain.ReadOptions(num_threads=1))
     train_iter = iter(train_iter_dataset)
     with tqdm(total=num_steps) as progress, closing(train_iter):
         for inputs, outputs in train_iter:
