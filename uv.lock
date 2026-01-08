@@ -1006,6 +1006,7 @@ version = "0.1.1"
 source = { virtual = "." }
 dependencies = [
     { name = "grain" },
+    { name = "msgpack" },
 ]
 
 [package.dev-dependencies]
@@ -1023,7 +1024,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "grain", specifier = ">=0.2.15" }]
+requires-dist = [
+    { name = "grain", specifier = ">=0.2.15" },
+    { name = "msgpack", specifier = ">=1.1.2" },
+]
 
 [package.metadata.requires-dev]
 dev = [

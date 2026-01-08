@@ -15,3 +15,24 @@ source = Sqlite3DataSource(
 )
 dataset = grain.MapDataset.source(source).shuffle().batch(32)
 ```
+
+## Converting to ArrayRecord
+
+Once you're ready to run larger experiments, convert the dataset to ArrayRecords using the `to_array_record` function which serializes records in [msgpack](https://msgpack.org) format with native support for NumPy arrays.
+
+```python
+from sqlgrain import to_array_record
+
+to_array_record(source, "output/", shard_every=1000)
+```
+
+Grain's [`ArrayRecordDataSource`](https://google-grain.readthedocs.io/en/latest/data_sources.html#arrayrecord-data-source) reads the raw bytes, and we need to integrate a decoder into the data pipeline. SQL Grain's `decode_record` takes care of that, matching the behavior of `to_array_record`.
+
+```python
+from sqlgrain import from_array_record, decode_record
+
+ar_source, metadata = from_array_record("output/")
+dataset = grain.MapDataset.source(ar_source).map(decode_record).batch(32)
+```
+
+`to_array_record` is agnostic to the type of the records, and you can also serialize datasets, e.g., for pre-batching.

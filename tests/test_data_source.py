@@ -6,23 +6,6 @@ import pytest
 from sqlgrain import Sqlite3DataSource
 
 
-@pytest.fixture
-def test_db(tmp_path: Path) -> Path:
-    """Create a temporary database with test data."""
-    db_path = tmp_path / "test.db"
-    conn = sqlite3.connect(db_path)
-    conn.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)")
-    conn.execute("CREATE TABLE orders (user_id INTEGER, item TEXT, amount INTEGER)")
-    conn.executemany("INSERT INTO users VALUES (?, ?)", [(1, "Alice"), (2, "Bob")])
-    conn.executemany(
-        "INSERT INTO orders VALUES (?, ?, ?)",
-        [(1, "apple", 10), (1, "banana", 20), (2, "cherry", 30)],
-    )
-    conn.commit()
-    conn.close()
-    return db_path
-
-
 def test_data_source_length(test_db: Path) -> None:
     """Data source reports correct number of keys."""
     source = Sqlite3DataSource(
@@ -48,8 +31,8 @@ def test_data_source_getitem(test_db: Path) -> None:
 
     # Second user (Bob) has 1 order
     record = source[1]
-    assert record["item"] == ("cherry",)
-    assert record["amount"] == (30,)
+    assert record["item"] == ("cherry", "orange")
+    assert record["amount"] == (30, 40)
 
 
 def test_data_source_with_record_params(test_db: Path) -> None:
@@ -65,9 +48,9 @@ def test_data_source_with_record_params(test_db: Path) -> None:
     record = source[0]
     assert record["item"] == ("banana",)
 
-    # Bob: cherry (amount=30) meets threshold
+    # Bob: cherry (amount=30) and orange (amount=40) meets threshold
     record = source[1]
-    assert record["item"] == ("cherry",)
+    assert record["item"] == ("cherry", "orange")
 
 
 def test_data_source_closing(test_db: Path) -> None:
