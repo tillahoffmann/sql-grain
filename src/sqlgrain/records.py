@@ -52,7 +52,7 @@ def decode_record(data: bytes, decode_hook: Callable[[dict], Any] | None = None)
 def to_array_record(
     records: Iterable,
     path: Path | str,
-    compression: str | None = None,
+    options: str = "group_size:1",
     shard_every: int | None = None,
     shard_size: int | None = None,
     key: str | None = None,
@@ -66,7 +66,7 @@ def to_array_record(
     Args:
         records: Records to save.
         path: Output directory.
-        compression: Compression setting passed to ArrayRecordWriter (e.g., "zstd").
+        options: Options passed to ArrayRecordWriter (e.g., "group_size:1,zstd").
         shard_every: Shard every N records.
         shard_size: Shard every N bytes.
         key: Key uniquely identifying the records for consistency checks.
@@ -75,7 +75,6 @@ def to_array_record(
     """
     path = Path(path)
     path.mkdir(parents=True)
-    compression = compression or ""
     encode = encode or _default_encode
 
     if shard_size is not None and shard_size < 1_000_000:
@@ -105,7 +104,7 @@ def to_array_record(
                     writer.close()
                     writer = None
                 name = f"data-{len(shard_paths):05}.arrayrecord"
-                writer = ArrayRecordWriter(str(path / name), compression)
+                writer = ArrayRecordWriter(str(path / name), options)
                 shard_paths.append(name)
                 size = 0
 
