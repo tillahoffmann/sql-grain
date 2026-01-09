@@ -1,10 +1,12 @@
+import functools
 import json
 import warnings
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Sequence, cast
 
 import msgpack
 from array_record.python.array_record_module import ArrayRecordWriter
+from grain import MapDataset
 from grain.sources import ArrayRecordDataSource
 
 
@@ -148,3 +150,50 @@ def from_array_record(
 
     paths = [path / shard for shard in metadata["shards"]]
     return (ArrayRecordDataSource(paths), metadata)
+
+
+def as_cached_array_record_dataset(
+    records: Iterable,
+    path: Path | str,
+    options: str = "group_size:1",
+    shard_every: int | None = None,
+    shard_size: int | None = None,
+    key: str | None = None,
+    encode: Callable[[Any], Any] | None = None,
+    aux: Any = None,
+    decode_hook: Callable[[dict], Any] | None = None,
+) -> MapDataset:
+    """Wrap an iterable of records in a cached ArrayRecord dataset. If the dataset
+    is not available as an ArrayRecord dataset at the designated path, it is
+    generated on the fly.
+
+    Args:
+        records: Records to save.
+        path: Output directory.
+        options: Options passed to ArrayRecordWriter (e.g., "group_size:1,zstd").
+        shard_every: Shard every N records.
+        shard_size: Shard every N bytes.
+        key: Key uniquely identifying the records for consistency checks.
+        encode: Encoder function to transform non-standard types for msgpack.
+        aux: JSON-serializable auxiliary information to add to the metadata file.
+        decode_hook: Hook for decoding custom objects.
+
+    Returns:
+        Cached dataset backed by ArrayRecords that wrap the input records.
+    """
+    path = Path(path)
+    if not path.is_dir():
+        to_array_record(
+            records,
+            path,
+            options=options,
+            shard_every=shard_every,
+            shard_size=shard_size,
+            key=key,
+            encode=encode,
+            aux=aux,
+        )
+    source, _ = from_array_record(path, key=key)
+    return MapDataset.source(cast(Sequence, source)).map(
+        functools.partial(decode_record, decode_hook=decode_hook)
+    )

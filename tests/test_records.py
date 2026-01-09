@@ -6,7 +6,12 @@ import pytest
 from grain import MapDataset
 
 from sqlgrain import Sqlite3DataSource
-from sqlgrain.records import decode_record, from_array_record, to_array_record
+from sqlgrain.records import (
+    as_cached_array_record_dataset,
+    decode_record,
+    from_array_record,
+    to_array_record,
+)
 
 
 @pytest.mark.parametrize("use_dataset", [False, True])
@@ -99,3 +104,23 @@ def test_shard_size(tmp_path: Path) -> None:
     for data in ar_source:
         record = decode_record(data)
         np.testing.assert_array_equal(record["data"], np.zeros(100, dtype=np.float32))
+
+
+def test_as_cached_array_record_dataset(tmp_path: Path) -> None:
+    """Test cached ArrayRecord dataset creation and reuse."""
+    records = [{"x": np.array([i, i + 1])} for i in range(5)]
+    path = tmp_path / "cached"
+
+    # First call creates the cache.
+    dataset = as_cached_array_record_dataset(records, path, key="test_key")
+    assert isinstance(dataset, MapDataset)
+    assert len(dataset) == 5
+    for i, record in enumerate(dataset):
+        np.testing.assert_array_equal(record["x"], np.array([i, i + 1]))
+
+    # Second call reuses existing cache. FIXME: The `records` argument is ignored; we
+    # should probably add a test for that.
+    dataset2 = as_cached_array_record_dataset([], path, key="test_key")
+    assert len(dataset2) == 5
+    for i, record in enumerate(dataset2):
+        np.testing.assert_array_equal(record["x"], np.array([i, i + 1]))
