@@ -1,6 +1,8 @@
 import hashlib
+import json
 import sqlite3
 import threading
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping, Self, Sequence, SupportsIndex, cast
 
@@ -55,7 +57,7 @@ class Sqlite3DataSource(RandomAccessDataSource[Mapping[str, Sequence]]):
         key_params: dict | None = None,
         record_params: dict | None = None,
     ) -> None:
-        self.database = Path(database)
+        self.database = Path(database).resolve()
         self.key_query = key_query
         self.record_query = record_query
         self.key_params = key_params or {}
@@ -122,19 +124,31 @@ class Sqlite3DataSource(RandomAccessDataSource[Mapping[str, Sequence]]):
         if conn:
             conn.close()
 
+    @property
+    def fingerprint(self) -> str:
+        """Fingerprint of the data source. If equal, the data sources *may* be the same.
+        If different, the data sources are *definitely* different.
+        """
+        last_modified = datetime.fromtimestamp(self.database.stat().st_mtime)
+        parts = {
+            "database": str(self.database),
+            "last_modified": last_modified.isoformat(),
+            "key_query": self.key_query,
+            "key_params": self.key_params,
+            "record_query": self.record_query,
+            "record_params": self.record_params,
+        }
+        serialized = json.dumps(parts, sort_keys=True)
+        return hashlib.sha256(serialized.encode()).hexdigest()
+
     def __repr__(self) -> str:
         # We need a `__repr__` implementation because `grain` uses it to assess if a
-        # data source is equivalent to another. This is a fuzzy hash implementation.
-        # I.e., the same hash does not guarantee the same database. But different hashes
-        # guarantee different databases.
-
-        key_query_hash = hashlib.sha256(self.key_query.encode()).hexdigest()
-        record_query_hash = hashlib.sha256(self.record_query.encode()).hexdigest()
-        last_modified = self.database.stat().st_mtime
+        # data source is equivalent to another. We use the fingerprint of the database.
+        last_modified = datetime.fromtimestamp(self.database.stat().st_mtime)
         return (
-            f"<{self.__class__.__name__} with database path '{self.database}' "
-            f"(last modified at {last_modified}), key query hash "
-            f"'{key_query_hash}', record query hash '{record_query_hash}'>"
+            f"<{self.__class__.__name__} with database '{self.database}' "
+            f"(last modified at {last_modified.isoformat()}), fingerprint "
+            f"{self.fingerprint}>"
         )
 
     def __setstate__(self, values: dict) -> None:

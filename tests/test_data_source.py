@@ -1,3 +1,4 @@
+import shutil
 import sqlite3
 from pathlib import Path
 
@@ -70,3 +71,43 @@ def test_data_source_closing(test_db: Path) -> None:
     # Check the database is closed.
     with pytest.raises(sqlite3.ProgrammingError):
         data_source._get_conn().execute("SELECT id FROM users")
+
+
+def test_data_source_repr(test_db: Path, tmp_path: Path) -> None:
+    kwargs = {
+        "database": test_db,
+        "key_query": "key query",
+        "record_query": "record query",
+        "key_params": {"key": "param"},
+        "record_params": {"record1": "param1", "record2": "param2"},
+    }
+    ref = Sqlite3DataSource(**kwargs)
+    ref_repr = repr(ref)
+
+    # Reordering dict entries leaves the fingerprint unchanged.
+    assert ref_repr == repr(
+        Sqlite3DataSource(
+            **(kwargs | {"record_params": {"record2": "param2", "record1": "param1"}})
+        )
+    )
+
+    # Make sure things are different when we change arguments.
+    other_db = tmp_path / "other.db"
+    shutil.copy(test_db, other_db)
+
+    others = [
+        {"database": other_db},
+        {"key_query": "other"},
+        {"record_query": "other"},
+        {"key_params": {"something": "else"}},
+        {"record_params": {"something": "different"}},
+    ]
+
+    for other in others:
+        assert ref_repr != repr(Sqlite3DataSource(**(kwargs | other)))
+
+    # Check modification.
+    with open(test_db, "w") as fp:
+        fp.write("different file")
+
+    assert ref_repr != repr(ref)
