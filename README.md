@@ -1,8 +1,8 @@
-# 🌾 SQL Grain
+# 🌾 SQL Grain [![CI](https://github.com/tillahoffmann/sql-grain/actions/workflows/ci.yml/badge.svg)](https://github.com/tillahoffmann/sql-grain/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/sql-grain)](https://pypi.org/project/sql-grain/)
 
 SQLite databases as [Grain](https://github.com/google/grain) data sources.
 
-sql-grain lets you prototype ML data pipelines using SQL queries before committing to a production data format. Define your training examples with expressive SQL—joins, window functions, filtering—and iterate quickly without preprocessing. When you're ready to scale, convert to ArrayRecord or similar formats; sql-grain is not designed for large-scale training.
+SQL Grain lets you prototype ML data pipelines using SQL queries before committing to a production data format. Define your training examples with expressive SQL—joins, window functions, filtering—and iterate quickly without preprocessing. When you're ready to scale, convert to ArrayRecord or similar formats; SQL Grain is not designed for large-scale training.
 
 ```python
 from sqlgrain import Sqlite3DataSource
